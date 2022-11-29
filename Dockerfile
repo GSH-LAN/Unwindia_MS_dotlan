@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.19.2-alpine AS build-env
+FROM golang:1.19.2-alpine AS build-env
 ADD . /app
 WORKDIR /app
 ARG TARGETOS
