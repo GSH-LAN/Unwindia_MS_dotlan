@@ -20,7 +20,6 @@ import (
 type DotlanDbClient interface {
 	GetTournaments(ctx context.Context, resultChan chan TournamentsResult)
 	GetContestForTournament(*Tournament) ([]Contest, error)
-	GetTournamentsContests(ctx context.Context, resultChan chan TournamentsContestsResult)
 }
 
 type DotlanDbClientImpl struct {
@@ -95,32 +94,6 @@ func (d *DotlanDbClientImpl) GetContestForTournament(tournament *Tournament) (co
 		contests[i].Tournament = *tournament
 	}
 	return
-}
-
-func (d *DotlanDbClientImpl) GetTournamentsContests(ctx context.Context, resultChan chan TournamentsContestsResult) {
-	var tcs []TournamentContest
-
-	tableName, fieldList, err := d.getFieldsFromModelWithoutTablename(TournamentContest{})
-	if err != nil {
-		resultChan <- TournamentsContestsResult{Result: nil, Error: err}
-		return
-	}
-
-	filter := d.config.GetConfig().CmsConfig.TournamentFilter
-	qry := fmt.Sprintf("select %s from %s where %s", fieldList, tableName, filter)
-
-	if rows, err := d.db.QueryxContext(ctx, qry); err != nil {
-		resultChan <- TournamentsContestsResult{Result: nil, Error: err}
-		return
-	} else {
-		for rows.Next() {
-			var tc TournamentContest
-			rows.Scan(&tc)
-			tcs = append(tcs, tc)
-		}
-	}
-
-	resultChan <- TournamentsContestsResult{Result: tcs, Error: nil}
 }
 
 func (d *DotlanDbClientImpl) getFieldsFromModelWithoutTablename(model sql.Table) (tableName string, fieldList string, err error) {

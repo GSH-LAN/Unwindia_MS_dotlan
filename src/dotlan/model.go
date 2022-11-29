@@ -70,26 +70,26 @@ type ContestsResult struct {
 type ContestList []Contest
 
 type Contest struct {
-	Tcid       uint           `db:"tcid"`
-	Tid        uint           `db:"tid"`
-	Tcrunde    int            `db:"tcrunde"`
-	Team_a     int            `db:"team_a"`
-	Team_b     int            `db:"team_b"`
-	Wins_a     int            `db:"wins_a"`
-	Wins_b     int            `db:"wins_b"`
-	Won        int            `db:"won"`
-	Dateline   time.Time      `db:"dateline"`
-	Host       string         `db:"host"`
-	User_id    int            `db:"user_id"`
-	Row        int            `db:"row"`
-	Comments   int            `db:"comments"`
-	Starttime  time.Time      `db:"starttime"`
-	Ignoretime int            `db:"ignoretime"`
-	Ready_a    time.Time      `db:"ready_a"`
-	Ready_b    time.Time      `db:"ready_b"`
-	Defaultwin int            `db:"defaultwin"`
-	Intern     sql.NullString `db:"intern"`
-	Public     sql.NullString `db:"public"`
+	Tcid uint `db:"tcid"`
+	Tid  uint `db:"tid"`
+	//Tcrunde    int            `db:"tcrunde"`
+	Team_a int `db:"team_a"`
+	Team_b int `db:"team_b"`
+	//Wins_a     int            `db:"wins_a"`
+	//Wins_b     int            `db:"wins_b"`
+	Won int `db:"won"`
+	//Dateline   time.Time      `db:"dateline"`
+	Host string `db:"host"`
+	//User_id    int            `db:"user_id"`
+	//Row        int            `db:"row"`
+	//Comments   int            `db:"comments"`
+	//Starttime  time.Time      `db:"starttime"`
+	//Ignoretime int            `db:"ignoretime"`
+	Ready_a time.Time `db:"ready_a"`
+	Ready_b time.Time `db:"ready_b"`
+	//Defaultwin int            `db:"defaultwin"`
+	//Intern     sql.NullString `db:"intern"`
+	//Public     sql.NullString `db:"public"`
 	Tournament Tournament
 }
 
@@ -114,48 +114,4 @@ type ParticipantsTeam struct {
 	rankpos       string
 	handy         string
 	orgakommentar string
-}
-
-func (ParticipantsTeam) TableName() string {
-	return "t_teilnehmer"
-}
-
-type TournamentsContestsResult struct {
-	Result []TournamentContest
-	Error  error
-}
-
-type TournamentContest struct {
-	Tid          uint       `db:"tt.tid"`
-	Topen        bool       `db:"tt.topen"`
-	Tclosed      bool       `db:"tt.tclosed"`
-	Tpause       bool       `db:"tt.tpause"`
-	Tuserproteam int        `db:"tt.tuserproteam"`
-	Tname        string     `db:"tt.tname"`
-	Contest      []TContest `db:"tc"`
-}
-
-func (TournamentContest) TableName() string {
-	return ""
-	//return []string{"t_turnier", "t_contest"}
-}
-
-func (TournamentContest) Join() string {
-	return "t_contest tc INNER JOIN t_turnier tt on tc.tid = tt.tid"
-}
-
-type TContest struct {
-	Tcid    uint      `db:"tcid"`
-	Ready_a time.Time `db:"ready_a"`
-	Ready_b time.Time `db:"ready_b"`
-	Won     int       `db:"won"`
-}
-
-type TournamentContest2 struct {
-	Tournament
-	Contest
-}
-
-func (TournamentContest2) TableName() string {
-	return "t_contest tc INNER JOIN t_turnier tt on tc.tid = tt.tid"
 }
