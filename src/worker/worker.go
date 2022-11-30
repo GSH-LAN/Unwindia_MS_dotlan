@@ -53,6 +53,7 @@ func NewWorker(ctx context.Context, workerpool *workerpool.WorkerPool, config co
 }
 
 func (w *WorkerImpl) Start(ticker *time.Ticker) error {
+	go w.process()
 	for {
 		select {
 		case <-ticker.C:
@@ -82,11 +83,6 @@ func (w *WorkerImpl) getMatchData() (statusList database.DotlanStatusList, dotla
 				errGroup = multierror.Append(errGroup, fmt.Errorf("statesRetrievalError: %w", dotlanStatesResult.Error))
 			}
 			statusList = dotlanStatesResult.Result
-			//	case contestResult := <-chanContests:
-			//		if contestResult.Error != nil {
-			//			errGroup = multierror.Append(errGroup, fmt.Errorf("contestRetrievalError: %w", contestResult.Error))
-			//		}
-			//		dotlanContestList = contestResult.Result
 		}
 	}
 
