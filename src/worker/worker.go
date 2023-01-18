@@ -101,15 +101,15 @@ func (w *WorkerImpl) process() {
 	}
 	defer w.semaphore.Release(1)
 
-	log.Info().Msg("Start processing")
+	log.Debug().Msg("Start processing")
 
 	dotlanStates, tournaments, err := w.getMatchData()
 	if err != nil {
 		log.Error().Err(err).Msg("Error getting match data")
 	}
 
-	log.Debug().Int("tournamentAmount", len(tournaments)).Int("dotlanAmount", len(dotlanStates)).Msg("Finished feching stuff")
-	log.Trace().Interface("tournaments", tournaments).Msg("Finished feching stuff")
+	log.Debug().Int("tournamentAmount", len(tournaments)).Int("dotlanAmount", len(dotlanStates)).Msg("Finished fetching stuff")
+	log.Trace().Interface("tournaments", tournaments).Msg("Finished fetching stuff")
 
 	// 2.1 Check if we have tournaments that are closed now, but we have in DB for management, if so, emit event (and maybe generate notification?)
 	// retrieve missing tournaments and compare state, maybe tournament is just paused?
@@ -211,10 +211,12 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 
 			// TODO: determine team name and playerinfos from dotlan into match info
 			team1 := matchservice.Team{
-				Id: strconv.Itoa(contest.Team_a),
+				Id:    strconv.Itoa(contest.Team_a),
+				Ready: contest.Ready_a.After(time.Time{}),
 			}
 			team2 := matchservice.Team{
-				Id: strconv.Itoa(contest.Team_b),
+				Id:    strconv.Itoa(contest.Team_b),
+				Ready: contest.Ready_b.After(time.Time{}),
 			}
 
 			ds := database.DotlanStatus{
@@ -263,10 +265,12 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 			} else if contest.Ready_a.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_1) {
 				log.Debug().Msg("Dotlan Team A ready")
 				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_1)
+				dotlanState.MatchInfo.Team1.Ready = true
 				subType = messagebroker.UNWINDIA_MATCH_READY_A
 			} else if contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_2) {
 				log.Debug().Msg("Dotlan Team B ready")
 				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_2)
+				dotlanState.MatchInfo.Team2.Ready = true
 				subType = messagebroker.UNWINDIA_MATCH_READY_B
 			} else if contest.Ready_a.After(time.Time{}) && contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_ALL) {
 				// TODO: well this step could maybe done directly with first iteration when all teams are ready but it's done this ugly way for now...

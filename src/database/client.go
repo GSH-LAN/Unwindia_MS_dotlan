@@ -1,3 +1,4 @@
+// Package database contains the local unwindia mongodb database models and client
 package database
 
 import (
