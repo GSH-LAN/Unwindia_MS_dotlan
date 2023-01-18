@@ -7,7 +7,10 @@ import (
 	"github.com/ThreeDotsLabs/watermill-pulsar/pkg/pulsar"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/GSH-LAN/Unwindia_MS_dotlan/src/database"
@@ -22,6 +25,14 @@ import (
 
 func main() {
 	mainContext, cancel := context.WithCancel(context.Background())
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func() {
+		<-c
+		cancel()
+		os.Exit(1)
+	}()
 
 	err := godotenv.Load()
 	if err != nil && !strings.Contains(err.Error(), "no such file") {
