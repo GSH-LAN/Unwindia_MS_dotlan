@@ -1,5 +1,5 @@
-FROM golang:1.19.2-alpine AS build-env
-ADD . /app
+FROM golang:1.19.5-alpine AS build-env
+COPY . /app
 WORKDIR /app
 ARG TARGETOS
 ARG TARGETARCH
