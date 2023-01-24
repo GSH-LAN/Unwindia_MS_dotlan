@@ -97,21 +97,96 @@ func (Contest) TableName() string {
 	return "t_contest"
 }
 
+type Team struct {
+	Tnid     int            `db:"tnid"`
+	Tid      int            `db:"tid"`
+	Tnname   sql.NullString `db:"tnname"`
+	Tnanz    sql.NullInt64  `db:"tnanz"`
+	Tnleader sql.NullInt64  `db:"tnleader"`
+	//Tnpasswd sql.NullString `db:"tnpasswd"`
+	//Tcheckedin    int            `db:"tcheckedin"`
+	//Loser         int            `db:"loser"`
+	Tnlogo int `db:"tnlogo"`
+	//Homepage      string         `db:"homepage"`
+	//Irc           string         `db:"irc"`
+	//Description   sql.NullString `db:"description"`
+	//Countrycode   string         `db:"countrycode"`
+	//Rankpos       string         `db:"rankpos"`
+	//Handy         string         `db:"handy"`
+	//Orgakommentar string         `db:"orgakommentar"`
+}
+
+func (Team) TableName() string {
+	return "t_teilnehmer"
+}
+
+type ParticipantsTeamList []ParticipantsTeam
+
 type ParticipantsTeam struct {
-	tnid          int
-	tid           int
-	tnname        sql.NullString
-	tnanz         sql.NullInt64
-	tnleader      sql.NullInt64
-	tnpasswd      sql.NullString
-	tcheckedin    int
-	loser         int
-	tnlogo        int
-	homepage      string
-	irc           string
-	description   sql.NullString
-	countrycode   string
-	rankpos       string
-	handy         string
-	orgakommentar string
+	Tnid   int `db:"tnid"`
+	UserId int `db:"user_id"`
+	//Dateline time.Time `db:"dateline"`
+}
+
+func (ParticipantsTeam) TableName() string {
+	return "t_teilnehmer_part"
+}
+
+type UserList []User
+
+type User struct {
+	ID   int    `db:"id"`
+	Nick string `db:"nick"`
+	//passwort            string    `db:"passwort"`
+	//clan                string    `db:"clan"`
+	//clantag             string    `db:"clantag"`
+	//vorname             string    `db:"vorname"`
+	//nachname            string    `db:"nachname"`
+	//strasse             string    `db:"strasse"`
+	//plz                 string    `db:"plz"`
+	//wohnort             string    `db:"wohnort"`
+	//countrycode         string    `db:"countrycode"`
+	//telefon             string    `db:"telefon"`
+	//handy               string    `db:"handy"`
+	//fax                 string    `db:"fax"`
+	//geb                 time.Time `db:"geb"`
+	//email               string    `db:"email"`
+	//newsletter          bool      `db:"newsletter"`
+	//female              bool      `db:"female"`
+	//skype               string    `db:"skype"`
+	//homepage            string    `db:"homepage"`
+	//motto               string    `db:"motto"`
+	//ver_age             int       `db:"ver_age"`
+	//kommentar           string    `db:"kommentar"`
+	//joinus              int       `db:"joinus"`
+	//ver_email           int       `db:"ver_email"`
+	//ver_salt            string    `db:"ver_salt"`
+	//lastpost            int       `db:"lastpost"`
+	//lastgetpasswd       int       `db:"lastgetpasswd"`
+	//style               string    `db:"style"`
+	//lastactivity        time.Time `db:"lastactivity"`
+	//lastupdate          int       `db:"lastupdate"`
+	//last_ip             string    `db:"last_ip"`
+	//lastvisit_forum     time.Time `db:"lastvisit_forum"`
+	//lastvisit_groupware int       `db:"lastvisit_groupware"`
+	//settings            string    `db:"settings"`
+	Avatar bool `db:"avatar"`
+	//avatar_name string `db:"avatar_name"`
+	//external_id         string    `db:"external_id"`
+	//external_info       string    `db:"external_info"`
+	//stats_postings      int       `db:"stats_postings"`
+	//stats_comments      int       `db:"stats_comments"`
+	//stats_messages_recv int       `db:"stats_messages_recv"`
+	//stats_messages_sent int       `db:"stats_messages_sent"`
+	//stats_sessions      int       `db:"stats_sessions"`
+	//stats_hits          int       `db:"stats_hits"`
+	//stats_profile_hits  int       `db:"stats_profile_hits"`
+	//kennzeichen         string    `db:"kennzeichen"`
+	//discord_id          string    `db:"discord_id"`
+	//pubg_name           string    `db:"pubg_name"`
+	//epic_name           string    `db:"epic_name"`
+}
+
+func (User) TableName() string {
+	return "user"
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/GSH-LAN/Unwindia_MS_dotlan/src/environment"
 	"github.com/GSH-LAN/Unwindia_common/src/go/config"
@@ -17,9 +18,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	dotlanTimeout = time.Second * 10
+)
+
 type DotlanDbClient interface {
 	GetTournaments(ctx context.Context, resultChan chan TournamentsResult)
-	GetContestForTournament(*Tournament) ([]Contest, error)
+	GetContestForTournament(ctx context.Context, tournament *Tournament) ([]Contest, error)
+	GetTeam(ctx context.Context, teamID int) (*Team, error)
+	GetTeamParticipants(ctx context.Context, teamID int) (ParticipantsTeamList, error)
+	GetUser(ctx context.Context, userID int) (*User, error)
+	GetUsersForTeam(ctx context.Context, teamID int) (UserList, error)
 }
 
 type DotlanDbClientImpl struct {
@@ -60,6 +69,9 @@ func (d *DotlanDbClientImpl) GetTournaments(ctx context.Context, resultChan chan
 	var tournaments []Tournament
 	var err error
 
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout)
+	defer cancel()
+
 	tableName, fieldList, err := d.getFieldsFromModelWithoutTablename(Tournament{})
 	if err != nil {
 		resultChan <- TournamentsResult{Result: nil, Error: err}
@@ -78,7 +90,9 @@ func (d *DotlanDbClientImpl) GetTournaments(ctx context.Context, resultChan chan
 	resultChan <- TournamentsResult{Result: tournaments, Error: nil}
 }
 
-func (d *DotlanDbClientImpl) GetContestForTournament(tournament *Tournament) (contests []Contest, err error) {
+func (d *DotlanDbClientImpl) GetContestForTournament(ctx context.Context, tournament *Tournament) (contests []Contest, err error) {
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout)
+	defer cancel()
 
 	tableName, fields, err := d.getFieldsFromModelWithoutTablename(Contest{})
 	if err != nil {
@@ -86,7 +100,7 @@ func (d *DotlanDbClientImpl) GetContestForTournament(tournament *Tournament) (co
 	}
 	filter := fmt.Sprintf("Tid = %v and (team_a != 0 or team_b != 0)", tournament.Tid)
 	qry := fmt.Sprintf("select %s from %s where %s", fields, tableName, filter)
-	if err := d.db.Select(&contests, qry); err != nil {
+	if err := d.db.SelectContext(ctx, &contests, qry); err != nil {
 		return nil, err
 	}
 
@@ -94,6 +108,111 @@ func (d *DotlanDbClientImpl) GetContestForTournament(tournament *Tournament) (co
 		contests[i].Tournament = *tournament
 	}
 	return
+}
+
+func (d *DotlanDbClientImpl) GetTeam(ctx context.Context, teamID int) (*Team, error) {
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout)
+	defer cancel()
+
+	tableName, fields, err := d.getFieldsFromModelWithoutTablename(Team{})
+	if err != nil {
+		return nil, err
+	}
+
+	qry := fmt.Sprintf("select %s from %s where tnid = ? LIMIT 1", fields, tableName)
+	log.Debug().Str("query", qry).Int("teamID", teamID).Msg("prepared query for getting team")
+
+	stmt, err := d.db.PreparexContext(ctx, qry)
+	if err != nil {
+		return nil, err
+	}
+
+	team := Team{}
+	row := stmt.QueryRowxContext(ctx, teamID)
+	if err = row.StructScan(&team); err != nil {
+		return nil, err
+	}
+
+	return &team, nil
+}
+
+func (d *DotlanDbClientImpl) GetTeamParticipants(ctx context.Context, teamID int) (ParticipantsTeamList, error) {
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout)
+	defer cancel()
+
+	tableName, fields, err := d.getFieldsFromModelWithoutTablename(ParticipantsTeam{})
+	if err != nil {
+		return nil, err
+	}
+	filter := fmt.Sprintf("tnid = %d", teamID)
+	qry := fmt.Sprintf("select %s from %s where %s LIMIT 1", fields, tableName, filter)
+
+	var participants []ParticipantsTeam
+	if err := d.db.SelectContext(ctx, &participants, qry); err != nil {
+		return nil, err
+	}
+
+	return participants, nil
+}
+
+func (d *DotlanDbClientImpl) GetUser(ctx context.Context, userID int) (*User, error) {
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout)
+	defer cancel()
+
+	tableName, fields, err := d.getFieldsFromModelWithoutTablename(User{})
+	if err != nil {
+		return nil, err
+	}
+
+	qry := fmt.Sprintf("select %s from %s where id = ? LIMIT 1", fields, tableName)
+	log.Debug().Str("query", qry).Int("userID", userID).Msg("prepared query for getting user")
+
+	stmt, err := d.db.PreparexContext(ctx, qry)
+	if err != nil {
+		return nil, err
+	}
+
+	user := User{}
+	row := stmt.QueryRowxContext(ctx, userID)
+	if err = row.StructScan(&user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (d *DotlanDbClientImpl) GetUsersForTeam(ctx context.Context, teamID int) (UserList, error) {
+	ctx, cancel := context.WithTimeout(ctx, dotlanTimeout*100)
+	defer cancel()
+
+	_, fields, err := d.getFieldsFromModelWithoutTablename(User{})
+	if err != nil {
+		return nil, err
+	}
+
+	qry := fmt.Sprintf("select %s from user u INNER JOIN t_teilnehmer_part ttp ON u.id = ttp.user_id where ttp.tnid = ?", fields)
+	log.Debug().Str("query", qry).Int("teamID", teamID).Msg("prepared query for getting users for team")
+
+	stmt, err := d.db.PreparexContext(ctx, qry)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []User
+	rows, err := stmt.QueryxContext(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var user User
+		if err = rows.StructScan(&user); err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
 }
 
 func (d *DotlanDbClientImpl) getFieldsFromModelWithoutTablename(model sql.Table) (tableName string, fieldList string, err error) {

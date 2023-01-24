@@ -4,6 +4,9 @@ PROJECT := $(shell git config --local remote.origin.url|sed -n 's#.*/\([^.]*\)\.
 	build \
 	test
 
+run:
+	go run src/main.go
+
 build:
 	go build ./...
 
