@@ -98,7 +98,7 @@ func (d *DotlanDbClientImpl) GetContestForTournament(ctx context.Context, tourna
 	if err != nil {
 		return nil, err
 	}
-	filter := fmt.Sprintf("Tid = %v and (team_a != 0 or team_b != 0)", tournament.Tid)
+	filter := fmt.Sprintf("Tid = %v and (team_a != 0 and team_b != 0)", tournament.Tid)
 	qry := fmt.Sprintf("select %s from %s where %s", fields, tableName, filter)
 	if err := d.db.SelectContext(ctx, &contests, qry); err != nil {
 		return nil, err

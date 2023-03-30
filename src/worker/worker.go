@@ -151,6 +151,7 @@ func (w *WorkerImpl) unlockContest(id uint) bool {
 
 func (w *WorkerImpl) publishContest(messageType messagebroker.MessageTypes, subType messagebroker.MatchEvent, contest *database.DotlanStatus) error {
 
+	// TODO: do this within a transaction and rollback in case we get an error publishing to messagequeue
 	if _, err := w.dbClient.Upsert(contest); err != nil {
 		log.Warn().Err(err).Msg("Error happend while updating document")
 		return err
@@ -224,49 +225,41 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 			var dotlanErr error
 			var errLock sync.Mutex
 
-			w.workerpool.Submit(func() {
-				dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			})
+			dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
+			if err != nil {
+				errLock.Lock()
+				defer errLock.Unlock()
+				log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
+				dotlanErr = multierror.Append(err)
+			}
+			wg.Done()
 
-			w.workerpool.Submit(func() {
-				team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			})
+			team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
+			if err != nil {
+				errLock.Lock()
+				defer errLock.Unlock()
+				log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
+				dotlanErr = multierror.Append(err)
+			}
+			wg.Done()
 
-			w.workerpool.Submit(func() {
-				dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			})
+			dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
+			if err != nil {
+				errLock.Lock()
+				defer errLock.Unlock()
+				log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
+				dotlanErr = multierror.Append(err)
+			}
+			wg.Done()
 
-			w.workerpool.Submit(func() {
-				team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			})
+			team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
+			if err != nil {
+				errLock.Lock()
+				defer errLock.Unlock()
+				log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
+				dotlanErr = multierror.Append(err)
+			}
+			wg.Done()
 
 			wg.Wait()
 			if dotlanErr != nil {
