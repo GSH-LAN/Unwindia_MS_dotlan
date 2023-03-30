@@ -225,41 +225,45 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 			var dotlanErr error
 			var errLock sync.Mutex
 
-			dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
-			if err != nil {
-				errLock.Lock()
-				defer errLock.Unlock()
-				log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
-				dotlanErr = multierror.Append(err)
-			}
-			wg.Done()
+			if contest.Team_a > 0 {
+				dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
+				if err != nil {
+					errLock.Lock()
+					defer errLock.Unlock()
+					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
+					dotlanErr = multierror.Append(err)
+				}
+				wg.Done()
 
-			team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
-			if err != nil {
-				errLock.Lock()
-				defer errLock.Unlock()
-				log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
-				dotlanErr = multierror.Append(err)
+				team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
+				if err != nil {
+					errLock.Lock()
+					defer errLock.Unlock()
+					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
+					dotlanErr = multierror.Append(err)
+				}
+				wg.Done()
 			}
-			wg.Done()
 
-			dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
-			if err != nil {
-				errLock.Lock()
-				defer errLock.Unlock()
-				log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
-				dotlanErr = multierror.Append(err)
-			}
-			wg.Done()
+			if contest.Team_b > 0 {
+				dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
+				if err != nil {
+					errLock.Lock()
+					defer errLock.Unlock()
+					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
+					dotlanErr = multierror.Append(err)
+				}
+				wg.Done()
 
-			team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
-			if err != nil {
-				errLock.Lock()
-				defer errLock.Unlock()
-				log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
-				dotlanErr = multierror.Append(err)
+				team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
+				if err != nil {
+					errLock.Lock()
+					defer errLock.Unlock()
+					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
+					dotlanErr = multierror.Append(err)
+				}
+				wg.Done()
 			}
-			wg.Done()
 
 			wg.Wait()
 			if dotlanErr != nil {
@@ -267,38 +271,50 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 			}
 
 			var team1Players []matchservice.Player
-			for _, user := range team1Users {
-				team1Players = append(team1Players, matchservice.Player{
-					Id:             strconv.Itoa(user.ID),
-					Name:           user.Nick,
-					GameProviderID: "",
-					Picture:        nil,
-					Captain:        dlTeam1.Tnleader.Valid && dlTeam1.Tnleader.Int64 == int64(user.ID),
-				})
+			if contest.Team_a > 0 {
+				for _, user := range team1Users {
+					team1Players = append(team1Players, matchservice.Player{
+						Id:             strconv.Itoa(user.ID),
+						Name:           user.Nick,
+						GameProviderID: "",
+						Picture:        nil,
+						Captain:        dlTeam1.Tnleader.Valid && dlTeam1.Tnleader.Int64 == int64(user.ID),
+					})
+				}
 			}
 
 			var team2Players []matchservice.Player
-			for _, user := range team2Users {
-				team2Players = append(team2Players, matchservice.Player{
-					Id:             strconv.Itoa(user.ID),
-					Name:           user.Nick,
-					GameProviderID: "",
-					Picture:        nil,
-					Captain:        dlTeam2.Tnleader.Valid && dlTeam2.Tnleader.Int64 == int64(user.ID),
-				})
+			if contest.Team_b > 0 {
+				for _, user := range team2Users {
+					team2Players = append(team2Players, matchservice.Player{
+						Id:             strconv.Itoa(user.ID),
+						Name:           user.Nick,
+						GameProviderID: "",
+						Picture:        nil,
+						Captain:        dlTeam2.Tnleader.Valid && dlTeam2.Tnleader.Int64 == int64(user.ID),
+					})
+				}
 			}
 
+			team1name := ""
+			if dlTeam1 != nil {
+				team1name = dlTeam1.Tnname.String
+			}
 			team1 := matchservice.Team{
 				Id:      strconv.Itoa(contest.Team_a),
 				Ready:   contest.Ready_a.After(time.Time{}),
-				Name:    dlTeam1.Tnname.String,
+				Name:    team1name,
 				Players: team1Players,
 			}
 
+			team2name := ""
+			if dlTeam2 != nil {
+				team2name = dlTeam2.Tnname.String
+			}
 			team2 := matchservice.Team{
 				Id:      strconv.Itoa(contest.Team_b),
 				Ready:   contest.Ready_b.After(time.Time{}),
-				Name:    dlTeam2.Tnname.String,
+				Name:    team2name,
 				Players: team2Players,
 			}
 

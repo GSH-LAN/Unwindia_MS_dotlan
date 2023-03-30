@@ -4,7 +4,7 @@ WORKDIR /app
 ARG TARGETOS
 ARG TARGETARCH
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o unwindia_ms_dotlan ./src
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o unwindia_ms_dotlan ./src
 
 # Runtime image
 FROM redhat/ubi8-minimal:8.7
