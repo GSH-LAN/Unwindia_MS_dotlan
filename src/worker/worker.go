@@ -378,6 +378,7 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 				// TODO: well this step could maybe done directly with first iteration when all teams are ready but it's done this ugly way for now...
 				log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
 				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_ALL)
+				dotlanState.MatchInfo.Ready = true
 				subType = messagebroker.UNWINDIA_MATCH_READY_ALL
 			} else if contest.Won > 0 && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
 				log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
