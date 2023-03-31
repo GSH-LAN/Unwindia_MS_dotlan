@@ -383,6 +383,8 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 			} else if contest.Won > 0 && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
 				log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
 				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
+				dotlanState.MatchInfo.Ready = true
+				dotlanState.MatchInfo.Finished = true
 				subType = messagebroker.UNWINDIA_MATCH_FINISHED
 			}
 
