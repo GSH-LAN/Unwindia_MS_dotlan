@@ -444,13 +444,6 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 					dotlanState.MatchInfo.Ready = true
 					dotlanState.MatchInfo.Finished = true
 					subType = messagebroker.UNWINDIA_MATCH_FINISHED
-				} else if (contest.Won > 0 || contest.Won == -1) && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
-					// contest is finished by dotlan
-					log.Debug().Msg("Finish contest by dotlan")
-					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
-					dotlanState.MatchInfo.Ready = true
-					dotlanState.MatchInfo.Finished = true
-					subType = messagebroker.UNWINDIA_MATCH_FINISHED
 				} else if contest.Ready_a.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_1) {
 					log.Debug().Msg("Dotlan Team A ready")
 					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_1)
