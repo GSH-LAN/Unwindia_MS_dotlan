@@ -17,4 +17,4 @@ COPY --from=build-env /app/app /
 ENV TZ=Europe/Berlin
 
 EXPOSE 8080
-CMD ["./unwindia_ms_dotlan"]
+CMD ["./app"]
