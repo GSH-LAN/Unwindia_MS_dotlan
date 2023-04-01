@@ -5,7 +5,7 @@ go 1.20
 replace github.com/ThreeDotsLabs/watermill-pulsar => github.com/MaxW1337/watermill-pulsar v0.0.0-20221124180151-6e4a9166181d
 
 require (
-	github.com/GSH-LAN/Unwindia_common v0.0.7
+	github.com/GSH-LAN/Unwindia_common v0.0.10
 	github.com/ThreeDotsLabs/watermill v1.2.0
 	github.com/ThreeDotsLabs/watermill-pulsar v0.0.0-00010101000000-000000000000
 	github.com/apache/pulsar-client-go v0.9.0
@@ -44,7 +44,6 @@ require (
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.3 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/linkedin/goavro/v2 v2.12.0 // indirect
 	github.com/lithammer/shortuuid/v3 v3.0.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

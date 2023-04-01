@@ -8,6 +8,7 @@ import (
 	"github.com/GSH-LAN/Unwindia_common/src/go/workitemLock"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/hashicorp/go-multierror"
+	"reflect"
 	"sync"
 
 	"github.com/segmentio/ksuid"
@@ -199,204 +200,354 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 
 	// process all contests
 	for _, contest := range contests {
-		log = log.With().Uint("contest", contest.Tcid).Logger()
-		if !w.lockContest(contest.Tcid) {
-			log.Info().Msg("Cannot lock contest, skipping")
-			continue
+		func() {
+			log = log.With().Uint("contest", contest.Tcid).Logger()
+			if !w.lockContest(contest.Tcid) {
+				log.Info().Msg("Cannot lock contest, skipping")
+				return
+			}
+			defer w.unlockContest(contest.Tcid)
+
+			if dotlanState := dotlanStates.GetElementById(contest.Tcid); dotlanState == nil {
+				// new contest
+				if tournament.Tclosed || tournament.Tpause {
+					// skip contest for further processing since it's a new contest which is closed or paused
+					log.Debug().Bool("Tclosed", tournament.Tclosed).Bool("Tpause", tournament.Tpause).Msg("Skipped contest")
+					return
+				}
+				log.Info().Msg("New contest found")
+
+				// TODO: improve this whole stuff to fetch all team information in parallel with go routines and channels
+
+				wg := sync.WaitGroup{}
+				wg.Add(2)
+
+				var dotlanErr error
+				var errLock sync.Mutex
+				var team1, team2 *matchservice.Team
+
+				go func() {
+					team1, err = w.getTeam(contest.Team_a)
+					if err != nil {
+						errLock.Lock()
+						defer errLock.Unlock()
+						log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching teama")
+						dotlanErr = multierror.Append(err)
+					}
+					wg.Done()
+				}()
+
+				go func() {
+					team2, err = w.getTeam(contest.Team_b)
+					if err != nil {
+						errLock.Lock()
+						defer errLock.Unlock()
+						log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching teamb")
+						dotlanErr = multierror.Append(err)
+					}
+					wg.Done()
+				}()
+
+				wg.Wait()
+				if dotlanErr != nil {
+					return
+				}
+
+				//var team1Users, team2Users dotlan.UserList
+				//var dotlanErr error
+				//var errLock sync.Mutex
+				//
+				//if contest.Team_a > 0 {
+				//	wg.Add(2)
+				//	w.workerpool.Submit(func() {
+				//		dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
+				//		if err != nil {
+				//			errLock.Lock()
+				//			defer errLock.Unlock()
+				//			log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
+				//			dotlanErr = multierror.Append(err)
+				//		}
+				//		wg.Done()
+				//		w.workerpool.Submit(func() {
+				//			team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
+				//			if err != nil {
+				//				errLock.Lock()
+				//				defer errLock.Unlock()
+				//				log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
+				//				dotlanErr = multierror.Append(err)
+				//			}
+				//			wg.Done()
+				//		})
+				//	})
+				//	wg.Done()
+				//} else {
+				//	wg.Done()
+				//}
+				//
+				//if contest.Team_b > 0 {
+				//	wg.Add(2)
+				//	w.workerpool.Submit(func() {
+				//		dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
+				//		if err != nil {
+				//			errLock.Lock()
+				//			defer errLock.Unlock()
+				//			log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
+				//			dotlanErr = multierror.Append(err)
+				//		}
+				//		wg.Done()
+				//	})
+				//	w.workerpool.Submit(func() {
+				//		team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
+				//		if err != nil {
+				//			errLock.Lock()
+				//			defer errLock.Unlock()
+				//			log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
+				//			dotlanErr = multierror.Append(err)
+				//		}
+				//		wg.Done()
+				//	})
+				//} else {
+				//	wg.Done()
+				//}
+				//
+				//wg.Wait()
+				//if dotlanErr != nil {
+				//	return
+				//}
+				//
+				//var team1Players []matchservice.Player
+				//if contest.Team_a > 0 {
+				//	for _, user := range team1Users {
+				//		team1Players = append(team1Players, matchservice.Player{
+				//			Id:             strconv.Itoa(user.ID),
+				//			Name:           user.Nick,
+				//			GameProviderID: "",
+				//			Picture:        nil,
+				//			Captain:        dlTeam1.Tnleader.Valid && dlTeam1.Tnleader.Int64 == int64(user.ID),
+				//		})
+				//	}
+				//}
+				//
+				//var team2Players []matchservice.Player
+				//if contest.Team_b > 0 {
+				//	for _, user := range team2Users {
+				//		team2Players = append(team2Players, matchservice.Player{
+				//			Id:             strconv.Itoa(user.ID),
+				//			Name:           user.Nick,
+				//			GameProviderID: "",
+				//			Picture:        nil,
+				//			Captain:        dlTeam2.Tnleader.Valid && dlTeam2.Tnleader.Int64 == int64(user.ID),
+				//		})
+				//	}
+				//}
+				//
+				//team1name := ""
+				//if dlTeam1 != nil {
+				//	team1name = dlTeam1.Tnname.String
+				//}
+				//team1 := matchservice.Team{
+				//	Id:      strconv.Itoa(contest.Team_a),
+				//	Ready:   contest.Ready_a.After(time.Time{}),
+				//	Name:    team1name,
+				//	Players: team1Players,
+				//}
+				//
+				//team2name := ""
+				//if dlTeam2 != nil {
+				//	team2name = dlTeam2.Tnname.String
+				//}
+				//team2 := matchservice.Team{
+				//	Id:      strconv.Itoa(contest.Team_b),
+				//	Ready:   contest.Ready_b.After(time.Time{}),
+				//	Name:    team2name,
+				//	Players: team2Players,
+				//}
+
+				var msTeam1, msTeam2 matchservice.Team
+
+				if team1 != nil {
+					msTeam1 = *team1
+					msTeam1.Ready = contest.Ready_a.After(time.Time{})
+				}
+				if team2 != nil {
+					msTeam2 = *team2
+					msTeam2.Ready = contest.Ready_b.After(time.Time{})
+				}
+
+				ds := database.DotlanStatus{
+					DotlanContestID: contest.Tcid,
+					Events: []database.DotlanStatusEvent{
+						database.CMS_CONTEST_NEW,
+					},
+					CreatedAt: time.Now(),
+					UpdatedAt: time.Now(),
+					MatchInfo: matchservice.MatchInfo{
+						Id:             ksuid.New().String(),
+						MsID:           strconv.Itoa(int(contest.Tcid)),
+						Team1:          msTeam1,
+						Team2:          msTeam2,
+						PlayerAmount:   10,
+						Game:           "csgo",
+						TournamentName: tournament.Tname,
+						MatchTitle:     fmt.Sprintf(matchTitleTmpl, tournament.Tname, msTeam1.Name, msTeam2.Name),
+						Ready:          msTeam1.Ready && msTeam2.Ready,
+						Finished:       contest.Won > 0 || contest.Won == -1,
+					},
+				}
+
+				go func() {
+					err = w.publishContest(messagebroker.MessageTypeCreated, messagebroker.UNWINDIA_MATCH_NEW, &ds)
+					if err != nil {
+						log.Error().Err(err).Msg("Error publishing contest")
+					}
+				}()
+
+				return
+
+			} else {
+				// existing contest, checking for changes
+				log.Debug().Msg("Processing existing contest")
+
+				// Check if current Team is empty, then reload team infos
+				if reflect.ValueOf(dotlanState.MatchInfo.Team1).IsZero() {
+					team, err := w.getTeam(contest.Team_a)
+					if err != nil {
+						log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error getting Team info")
+					} else {
+						if team != nil {
+							team.Ready = contest.Ready_a.After(time.Time{})
+							dotlanState.MatchInfo.Team1 = *team
+						}
+					}
+				}
+
+				// Check if current Team is empty, then reload team infos
+				if reflect.ValueOf(dotlanState.MatchInfo.Team2).IsZero() {
+					team, err := w.getTeam(contest.Team_b)
+					if err != nil {
+						log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error getting Team info")
+					} else {
+						if team != nil {
+							team.Ready = contest.Ready_b.After(time.Time{})
+							dotlanState.MatchInfo.Team2 = *team
+						}
+					}
+				}
+				dotlanState.MatchInfo.MatchTitle = fmt.Sprintf(matchTitleTmpl, tournament.Tname, dotlanState.MatchInfo.Team1.Name, dotlanState.MatchInfo.Team2.Name)
+
+				var subType messagebroker.MatchEvent = -1
+
+				if tournament.Tclosed && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
+					// tournament is closed, finish all contests to free ressources
+					log.Debug().Msg("Finish contest due to closed tournament")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
+					dotlanState.MatchInfo.Ready = true
+					dotlanState.MatchInfo.Finished = true
+					subType = messagebroker.UNWINDIA_MATCH_FINISHED
+				} else if (contest.Won > 0 || contest.Won == -1) && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
+					// contest is finished by dotlan
+					log.Debug().Msg("Finish contest by dotlan")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
+					dotlanState.MatchInfo.Ready = true
+					dotlanState.MatchInfo.Finished = true
+					subType = messagebroker.UNWINDIA_MATCH_FINISHED
+				} else if contest.Ready_a.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_1) {
+					log.Debug().Msg("Dotlan Team A ready")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_1)
+					dotlanState.MatchInfo.Team1.Ready = true
+					subType = messagebroker.UNWINDIA_MATCH_READY_A
+				} else if contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_2) {
+					log.Debug().Msg("Dotlan Team B ready")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_2)
+					dotlanState.MatchInfo.Team2.Ready = true
+					subType = messagebroker.UNWINDIA_MATCH_READY_B
+				} else if contest.Ready_a.After(time.Time{}) && contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_ALL) {
+					// TODO: well this step could maybe done directly with first iteration when all teams are ready but it's done this ugly way for now...
+					log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_ALL)
+					dotlanState.MatchInfo.Ready = true
+					subType = messagebroker.UNWINDIA_MATCH_READY_ALL
+				} else if (contest.Won > 0 || contest.Won == -1) && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
+					log.Debug().Msg("Dotlan Contest FINISHED")
+					dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
+					dotlanState.MatchInfo.Ready = true
+					dotlanState.MatchInfo.Finished = true
+					subType = messagebroker.UNWINDIA_MATCH_FINISHED
+				}
+
+				if subType != -1 {
+					dotlanState.UpdatedAt = time.Now()
+					err = w.publishContest(messagebroker.MessageTypeUpdated, subType, dotlanState)
+					if err != nil {
+						log.Error().Err(err).Msg("Error publishing contest")
+					}
+				}
+
+				return
+			}
+		}()
+	}
+
+}
+
+// getTeam gets all infos for a Team
+func (w *WorkerImpl) getTeam(teamID int) (*matchservice.Team, error) {
+	wg := sync.WaitGroup{}
+	var dlTeam *dotlan.Team
+	var teamUsers dotlan.UserList
+	var dotlanErr error
+	var errLock sync.Mutex
+
+	if teamID <= 0 {
+		log.Warn().Int("teamId", teamID).Msg("invalid teamId")
+		return nil, nil
+	}
+
+	wg.Add(2)
+	w.workerpool.Submit(func() {
+		dlTeam, dotlanErr = w.dotlanClient.GetTeam(w.ctx, teamID)
+		if dotlanErr != nil {
+			errLock.Lock()
+			defer errLock.Unlock()
+			log.Error().Err(dotlanErr).Int("teamId", teamID).Msg("error fetching dotlan info for team 2")
+			dotlanErr = multierror.Append(dotlanErr)
 		}
-		defer w.unlockContest(contest.Tcid)
+		wg.Done()
+	})
+	w.workerpool.Submit(func() {
+		teamUsers, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, teamID)
+		if dotlanErr != nil {
+			errLock.Lock()
+			defer errLock.Unlock()
+			log.Error().Err(dotlanErr).Int("teamId", teamID).Msg("error fetching users for team 2")
+			dotlanErr = multierror.Append(dotlanErr)
+		}
+		wg.Done()
+	})
 
-		if dotlanState := dotlanStates.GetElementById(contest.Tcid); dotlanState == nil {
-			// new contest
-			if tournament.Tclosed || tournament.Tpause {
-				// skip contest for further processing since it's a new contest which is closed or paused
-				log.Debug().Bool("Tclosed", tournament.Tclosed).Bool("Tpause", tournament.Tpause).Msg("Skipped contest")
-				continue
-			}
-			log.Info().Msg("New contest found")
+	wg.Wait()
 
-			// TODO: improve this whole stuff to fetch all team information in parallel with go routines and channels
-
-			wg := sync.WaitGroup{}
-			wg.Add(4)
-
-			var dlTeam1, dlTeam2 *dotlan.Team
-			var team1Users, team2Users dotlan.UserList
-			var dotlanErr error
-			var errLock sync.Mutex
-
-			if contest.Team_a > 0 {
-				dlTeam1, err = w.dotlanClient.GetTeam(w.ctx, contest.Team_a)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching dotlan info for team 1")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-
-				team1Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_a)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_a).Msg("error fetching users for team 1")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			}
-
-			if contest.Team_b > 0 {
-				dlTeam2, dotlanErr = w.dotlanClient.GetTeam(w.ctx, contest.Team_b)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching dotlan info for team 2")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-
-				team2Users, dotlanErr = w.dotlanClient.GetUsersForTeam(w.ctx, contest.Team_b)
-				if err != nil {
-					errLock.Lock()
-					defer errLock.Unlock()
-					log.Error().Err(err).Int("teamId", contest.Team_b).Msg("error fetching users for team 2")
-					dotlanErr = multierror.Append(err)
-				}
-				wg.Done()
-			}
-
-			wg.Wait()
-			if dotlanErr != nil {
-				continue
-			}
-
-			var team1Players []matchservice.Player
-			if contest.Team_a > 0 {
-				for _, user := range team1Users {
-					team1Players = append(team1Players, matchservice.Player{
-						Id:             strconv.Itoa(user.ID),
-						Name:           user.Nick,
-						GameProviderID: "",
-						Picture:        nil,
-						Captain:        dlTeam1.Tnleader.Valid && dlTeam1.Tnleader.Int64 == int64(user.ID),
-					})
-				}
-			}
-
-			var team2Players []matchservice.Player
-			if contest.Team_b > 0 {
-				for _, user := range team2Users {
-					team2Players = append(team2Players, matchservice.Player{
-						Id:             strconv.Itoa(user.ID),
-						Name:           user.Nick,
-						GameProviderID: "",
-						Picture:        nil,
-						Captain:        dlTeam2.Tnleader.Valid && dlTeam2.Tnleader.Int64 == int64(user.ID),
-					})
-				}
-			}
-
-			team1name := ""
-			if dlTeam1 != nil {
-				team1name = dlTeam1.Tnname.String
-			}
-			team1 := matchservice.Team{
-				Id:      strconv.Itoa(contest.Team_a),
-				Ready:   contest.Ready_a.After(time.Time{}),
-				Name:    team1name,
-				Players: team1Players,
-			}
-
-			team2name := ""
-			if dlTeam2 != nil {
-				team2name = dlTeam2.Tnname.String
-			}
-			team2 := matchservice.Team{
-				Id:      strconv.Itoa(contest.Team_b),
-				Ready:   contest.Ready_b.After(time.Time{}),
-				Name:    team2name,
-				Players: team2Players,
-			}
-
-			ds := database.DotlanStatus{
-				DotlanContestID: contest.Tcid,
-				Events: []database.DotlanStatusEvent{
-					database.CMS_CONTEST_NEW,
-				},
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-				MatchInfo: matchservice.MatchInfo{
-					Id:             ksuid.New().String(),
-					MsID:           strconv.Itoa(int(contest.Tcid)),
-					Team1:          team1,
-					Team2:          team2,
-					PlayerAmount:   10,
-					Game:           "csgo",
-					TournamentName: tournament.Tname,
-					MatchTitle:     fmt.Sprintf(matchTitleTmpl, tournament.Tname, team1.Name, team2.Name),
-					Ready:          team1.Ready && team2.Ready,
-					Finished:       contest.Won > 0,
-				},
-			}
-
-			go func() {
-				err = w.publishContest(messagebroker.MessageTypeCreated, messagebroker.UNWINDIA_MATCH_NEW, &ds)
-				if err != nil {
-					log.Error().Err(err).Msg("Error publishing contest")
-				}
-			}()
-
-			continue
-
-		} else {
-			// existing contest, checking for changes
-			log.Debug().Msg("Processing existing contest")
-
-			var subType messagebroker.MatchEvent = -1
-
-			if tournament.Tclosed && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
-				// tournament is closed, finish all contests to free ressources
-				log.Debug().Msg("Finish contest due to closed tournament")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
-				subType = messagebroker.UNWINDIA_MATCH_FINISHED
-			} else if contest.Won > 0 && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
-				// contest is finished by dotlan
-				log.Debug().Msg("Finish contest by dotlan")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
-				subType = messagebroker.UNWINDIA_MATCH_FINISHED
-			} else if contest.Ready_a.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_1) {
-				log.Debug().Msg("Dotlan Team A ready")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_1)
-				dotlanState.MatchInfo.Team1.Ready = true
-				subType = messagebroker.UNWINDIA_MATCH_READY_A
-			} else if contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_2) {
-				log.Debug().Msg("Dotlan Team B ready")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_2)
-				dotlanState.MatchInfo.Team2.Ready = true
-				subType = messagebroker.UNWINDIA_MATCH_READY_B
-			} else if contest.Ready_a.After(time.Time{}) && contest.Ready_b.After(time.Time{}) && !dotlanState.Events.Contains(database.CMS_CONTEST_READY_ALL) {
-				// TODO: well this step could maybe done directly with first iteration when all teams are ready but it's done this ugly way for now...
-				log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_READY_ALL)
-				dotlanState.MatchInfo.Ready = true
-				subType = messagebroker.UNWINDIA_MATCH_READY_ALL
-			} else if contest.Won > 0 && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
-				log.Debug().Msg("Dotlan ALL TEAMS ARE READY")
-				dotlanState.Events = append(dotlanState.Events, database.CMS_CONTEST_FINISHED)
-				dotlanState.MatchInfo.Ready = true
-				dotlanState.MatchInfo.Finished = true
-				subType = messagebroker.UNWINDIA_MATCH_FINISHED
-			}
-
-			if subType != -1 {
-				dotlanState.UpdatedAt = time.Now()
-				err = w.publishContest(messagebroker.MessageTypeUpdated, subType, dotlanState)
-				if err != nil {
-					log.Error().Err(err).Msg("Error publishing contest")
-				}
-			}
-
-			continue
+	var teamPlayers []matchservice.Player
+	if teamID > 0 {
+		for _, user := range teamUsers {
+			teamPlayers = append(teamPlayers, matchservice.Player{
+				Id:             strconv.Itoa(user.ID),
+				Name:           user.Nick,
+				GameProviderID: "",
+				Picture:        nil,
+				Captain:        dlTeam.Tnleader.Valid && dlTeam.Tnleader.Int64 == int64(user.ID),
+			})
 		}
 	}
+
+	if dotlanErr != nil {
+		return nil, dotlanErr
+	}
+
+	return &matchservice.Team{
+		Id:      strconv.Itoa(teamID),
+		Ready:   false,
+		Name:    dlTeam.Tnname.String,
+		Players: teamPlayers,
+	}, nil
 }

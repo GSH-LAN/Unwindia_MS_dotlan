@@ -1,17 +1,20 @@
 FROM golang:1.20.2-alpine AS build-env
-COPY . /app
+ADD . /app
 WORKDIR /app
 ARG TARGETOS
 ARG TARGETARCH
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o unwindia_ms_dotlan ./src
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o app ./src
 
 # Runtime image
 FROM redhat/ubi8-minimal:8.7
 
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-RUN microdnf update && microdnf -y install ca-certificates inotify-tools
+RUN microdnf update && microdnf -y install ca-certificates inotify-tools && microdnf reinstall -y tzdata
 
-COPY --from=build-env /app/unwindia_ms_dotlan /
+COPY --from=build-env /app/app /
+
+ENV TZ=Europe/Berlin
+
 EXPOSE 8080
 CMD ["./unwindia_ms_dotlan"]

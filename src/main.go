@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/GSH-LAN/Unwindia_MS_dotlan/src/database"
 	"github.com/GSH-LAN/Unwindia_MS_dotlan/src/dotlan"
