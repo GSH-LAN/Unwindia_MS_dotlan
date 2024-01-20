@@ -5,6 +5,7 @@ import (
 	"github.com/GSH-LAN/Unwindia_common/src/go/workitemLock"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-pulsar/pkg/pulsar"
+	pulsarClient "github.com/apache/pulsar-client-go/pulsar"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
@@ -77,17 +78,22 @@ func main() {
 		log.Fatal().Err(err).Msg("Error creating database client")
 	}
 
-	publisher, err := pulsar.NewPublisher(
-		pulsar.PublisherConfig{
-			URL:            env.PulsarURL,
-			Authentication: env.PulsarAuth,
-		},
+	pulsarConn, err := pulsarClient.NewClient(pulsarClient.ClientOptions{
+		URL:            env.PulsarURL,
+		Authentication: env.PulsarAuth,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error creating pulsar connection")
+	}
+
+	publisher, err := pulsar.NewPublisherWithPulsarClient(
+		pulsarConn,
 		watermill.NewStdLoggerWithOut(log.Logger, true, false),
 	)
 
 	lock := workitemLock.NewMemoryWorkItemLock()
 
-	w := worker.NewWorker(mainContext, wp, configClient, dotlanClient, dbClient, publisher, lock)
+	w := worker.NewWorker(mainContext, wp, configClient, dotlanClient, dbClient, publisher, lock, env.BaseEnvironment.PulsarBaseTopic)
 
 	err = w.Start(time.NewTicker(env.ProcessInterval))
 	if err != nil {

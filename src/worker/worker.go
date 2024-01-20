@@ -42,9 +42,10 @@ type WorkerImpl struct {
 	messagePublisher message.Publisher
 	semaphore        *semaphore.Weighted
 	dotlanLock       workitemLock.WorkItemLock
+	baseTopic        string
 }
 
-func NewWorker(ctx context.Context, workerpool *workerpool.WorkerPool, config config.ConfigClient, dotlanClient dotlan.DotlanDbClient, dbClient database.DatabaseClient, publisher message.Publisher, workitemLock workitemLock.WorkItemLock) Worker {
+func NewWorker(ctx context.Context, workerpool *workerpool.WorkerPool, config config.ConfigClient, dotlanClient dotlan.DotlanDbClient, dbClient database.DatabaseClient, publisher message.Publisher, workitemLock workitemLock.WorkItemLock, baseTopic string) Worker {
 	w := WorkerImpl{
 		ctx:              ctx,
 		workerpool:       workerpool,
@@ -54,6 +55,7 @@ func NewWorker(ctx context.Context, workerpool *workerpool.WorkerPool, config co
 		messagePublisher: publisher,
 		semaphore:        semaphore.NewWeighted(int64(1)),
 		dotlanLock:       workitemLock,
+		baseTopic:        baseTopic,
 	}
 	return &w
 }
@@ -172,7 +174,7 @@ func (w *WorkerImpl) publishContest(messageType messagebroker.MessageTypes, subT
 			Payload: j,
 		}
 
-		err = w.messagePublisher.Publish(messagebroker.TOPIC, &msg)
+		err = w.messagePublisher.Publish(w.baseTopic, &msg)
 		if err != nil {
 			log.Error().Err(err).Msg("Error publishing to messagebroker")
 			return err

@@ -32,13 +32,14 @@ type DotlanDbClient interface {
 }
 
 type DotlanDbClientImpl struct {
-	ctx             context.Context
-	db              *sqlx.DB
-	env             *environment.Environment
-	lock            sync.Mutex
-	workerpool      *workerpool.WorkerPool
-	modelFieldCache map[string]string
-	config          config.ConfigClient
+	ctx                 context.Context
+	db                  *sqlx.DB
+	env                 *environment.Environment
+	lock                sync.Mutex
+	workerpool          *workerpool.WorkerPool
+	modelFieldCache     map[string]string
+	modelFieldCacheLock sync.RWMutex
+	config              config.ConfigClient
 }
 
 func NewClient(ctx context.Context, env *environment.Environment, wp *workerpool.WorkerPool, config config.ConfigClient) (DotlanDbClient, error) {
@@ -56,12 +57,13 @@ func NewClient(ctx context.Context, env *environment.Environment, wp *workerpool
 	}
 
 	return &DotlanDbClientImpl{
-		ctx:             ctx,
-		db:              db,
-		env:             env,
-		workerpool:      wp,
-		config:          config,
-		modelFieldCache: make(map[string]string),
+		ctx:                 ctx,
+		db:                  db,
+		env:                 env,
+		workerpool:          wp,
+		config:              config,
+		modelFieldCache:     make(map[string]string),
+		modelFieldCacheLock: sync.RWMutex{},
 	}, nil
 }
 
@@ -226,7 +228,8 @@ func (d *DotlanDbClientImpl) getFieldsFromModelWithoutTablename(model sql.Table)
 }
 
 func (d *DotlanDbClientImpl) getFieldsFromModelWithTablename(model interface{}, tableName string) (string, error) {
-
+	d.modelFieldCacheLock.RLock()
+	defer d.modelFieldCacheLock.RUnlock()
 	if queryString, ok := d.modelFieldCache[tableName]; ok {
 		log.Debug().Str("table", tableName).Str("query", queryString).Msg("Retrieved query from cache")
 		return queryString, nil
@@ -256,7 +259,11 @@ func (d *DotlanDbClientImpl) getFieldsFromModelWithTablename(model interface{}, 
 		}
 	}
 
-	d.modelFieldCache[tableName] = queryString
+	go func() {
+		d.modelFieldCacheLock.Lock()
+		defer d.modelFieldCacheLock.Unlock()
+		d.modelFieldCache[tableName] = queryString
+	}()
 
 	return queryString, nil
 }
