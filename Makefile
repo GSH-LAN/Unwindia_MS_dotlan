@@ -1,4 +1,4 @@
-PROJECT := $(shell git config --local remote.origin.url|sed -n 's#.*/\([^.]*\)\.git#\1#p'|sed 's/[A-Z]/\L&/g')
+PROJECT := $(shell git config --local remote.origin.url | sed -n 's\#.*/\([^.]*\)\.git\#\1\#p'| awk '{print tolower($$0)}' )
 
 .PHONY: \
 	build \

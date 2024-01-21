@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o app ./src
 FROM redhat/ubi9-minimal:9.3
 
 RUN rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-RUN microdnf update && microdnf -y install ca-certificates inotify-tools && microdnf reinstall -y tzdata
+RUN microdnf -y update && microdnf -y install ca-certificates inotify-tools && microdnf reinstall -y tzdata
 
 COPY --from=build-env /app/app /
 
