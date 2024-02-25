@@ -5,7 +5,7 @@ go 1.21
 replace github.com/ThreeDotsLabs/watermill-pulsar => github.com/MaxW1337/watermill-pulsar v0.0.0-20221124180151-6e4a9166181d
 
 require (
-	github.com/GSH-LAN/Unwindia_common v0.0.12
+	github.com/GSH-LAN/Unwindia_common v0.0.13
 	github.com/ThreeDotsLabs/watermill v1.3.5
 	github.com/ThreeDotsLabs/watermill-pulsar v0.0.0-00010101000000-000000000000
 	github.com/apache/pulsar-client-go v0.12.0
