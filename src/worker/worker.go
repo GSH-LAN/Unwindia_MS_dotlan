@@ -439,6 +439,9 @@ func (w *WorkerImpl) processTournament(tournament dotlan.Tournament, dotlanState
 
 				var subType messagebroker.MatchEvent = -1
 
+				// update all fields with infos from dotlan
+				dotlanState.MatchInfo.TournamentName = tournament.Tname
+
 				if tournament.Tclosed && !dotlanState.Events.Contains(database.CMS_CONTEST_FINISHED) {
 					// tournament is closed, finish all contests to free ressources
 					log.Debug().Msg("Finish contest due to closed tournament")
